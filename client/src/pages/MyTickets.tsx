@@ -175,6 +175,7 @@ export function MyTickets() {
                     onChange={(e) => updateFilter("status", e.target.value)}
                 >
                     <option value="">All Statuses</option>
+                    <option value="DASHBOARD_OPEN">My Open Tickets</option>
                     {Object.entries(STATUS_LABELS).map(([value, label]) => (
                         <option key={value} value={value}>
                             {label}
