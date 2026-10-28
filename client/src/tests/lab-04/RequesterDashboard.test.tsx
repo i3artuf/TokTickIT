@@ -43,6 +43,7 @@ describe("RequesterDashboard (UI-03)", () => {
         await screen.findByTestId("requester-dashboard-card-open");
 
         expect(screen.getByTestId("requester-dashboard-card-open")).toHaveTextContent("3");
+        expect(screen.getByTestId("requester-dashboard-card-open")).toHaveAttribute("href", "/my-tickets?status=DASHBOARD_OPEN");
         expect(screen.getByTestId("requester-dashboard-card-in-progress")).toHaveTextContent("2");
         expect(screen.getByTestId("requester-dashboard-card-resolved")).toHaveTextContent("5");
         expect(screen.getByTestId("requester-dashboard-card-closed")).toHaveTextContent("12");
