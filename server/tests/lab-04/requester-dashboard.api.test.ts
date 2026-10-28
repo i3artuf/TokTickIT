@@ -51,6 +51,18 @@ describe("Requester dashboard API (API-15, API-17, API-25)", () => {
         };
     }
 
+    it("AUDIT-DASH-03: My Open drill-down agrees with the metric and preserves ownership", async () => {
+        const dashboard = await getRequesterDashboard(aliceToken);
+        const list = await request(app).get("/api/tickets?status=DASHBOARD_OPEN&pageSize=50")
+            .set("Cookie", `toktickit_session=${aliceToken}`);
+        expect(list.status).toBe(200);
+        expect(list.body.pagination.total).toBe(dashboard.body.data.counts.open);
+        expect(list.body.tickets.length).toBeGreaterThan(0);
+        expect(list.body.tickets.every((t: any) => REQUESTER_OPEN_STATUSES.includes(t.currentStatus))).toBe(true);
+        const allowedIds = new Set((await manualRequesterCounts(alice.id)).open.map(t => t.id));
+        expect(list.body.tickets.every((t: any) => allowedIds.has(t.id))).toBe(true);
+    });
+
     beforeAll(async () => {
         // Lab 2 suites wipe all Tickets mid-run; restore the Issue 2 baseline first so the
         // BR-11 assertions below run against the real seeded In Progress Ticket.
