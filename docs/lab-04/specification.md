@@ -67,16 +67,16 @@ authorization; every mutating endpoint independently re-checks role + ownership/
 Statuses: `New`, `Open`, `In Progress`, `Waiting for Requester`, `Resolved`, `Closed`,
 `Reopened`, `Cancelled`.
 
-| From ↓ / To → | Open | In Progress | Waiting for Requester | Resolved | Closed | Reopened | Cancelled |
-|---|---|---|---|---|---|---|---|
-| **New** | IT Staff/Admin | — | — | — | — | — | IT Staff/Admin, or Requester (own Ticket) |
-| **Open** | — | IT Staff/Admin | IT Staff/Admin | — | — | — | IT Staff/Admin, or Requester (own Ticket) |
-| **In Progress** | — | — | IT Staff/Admin | IT Staff/Admin (BR-06) | — | — | IT Staff/Admin |
-| **Waiting for Requester** | — | IT Staff/Admin | — | IT Staff/Admin (BR-06) | — | — | IT Staff/Admin |
-| **Resolved** | — | — | — | — | IT Staff/Admin (BR-07) | IT Staff/Admin (BR-08 inverse) | — |
-| **Closed** | — | — | — | — | — | IT Staff/Admin (BR-08) | — |
-| **Reopened** | — | IT Staff/Admin | IT Staff/Admin | — | — | — | IT Staff/Admin |
-| **Cancelled** | — | — | — | — | — | — | terminal (BR-09) |
+| From ↓ / To → | New | Open | In Progress | Waiting for Requester | Resolved | Closed | Reopened | Cancelled |
+|---|---|---|---|---|---|---|---|---|
+| **New** | — | IT Staff/Admin | — | — | — | — | — | IT Staff/Admin, or Requester (own Ticket) |
+| **Open** | — | — | IT Staff/Admin | IT Staff/Admin | — | — | — | IT Staff/Admin, or Requester (own Ticket) |
+| **In Progress** | — | — | — | IT Staff/Admin | IT Staff/Admin (BR-06) | — | — | IT Staff/Admin |
+| **Waiting for Requester** | — | — | IT Staff/Admin | — | IT Staff/Admin (BR-06) | — | — | IT Staff/Admin |
+| **Resolved** | — | — | — | — | — | IT Staff/Admin (BR-07) | IT Staff/Admin (BR-08 inverse) | — |
+| **Closed** | — | — | — | — | — | — | IT Staff/Admin (BR-08) | — |
+| **Reopened** | — | — | IT Staff/Admin | IT Staff/Admin | — | — | — | IT Staff/Admin |
+| **Cancelled** | — | — | — | — | — | — | — | terminal (BR-09) |
 
 Blank cells are forbidden transitions and are rejected by the backend with `400 Bad Request` (`INVALID_TRANSITION`)
 regardless of which UI path (or direct API call) attempted them. A Requester may only trigger the
@@ -126,7 +126,7 @@ later) only IT Staff/Admin may cancel.
 | BR-07 | A Ticket may only move to `Closed` from `Resolved`, by IT Staff/Admin. The same `resolutionSummary` requirement from BR-06 applies. No auto-close in Lab 4 (excluded scope). |
 | BR-08 | A `Closed` Ticket may be moved to `Reopened` by IT Staff/Admin only (Requester may request reopen via comment, but cannot change status). |
 | BR-09 | A `Cancelled` Ticket is terminal; no further status transitions or new Actions Taken are permitted (existing Actions Taken remain visible). |
-| BR-10 | An Action Taken can be edited by its creator within 15 minutes of creation, or by an Administrator at any time; edits are recorded with an `updatedAt` timestamp (append-only audit trail is preserved). |
+| BR-10 | An Action Taken can be edited by its creator within 15 minutes of creation, or by an Administrator at any time; edits update `updatedAt`. Audit finding: previous field values are not retained, so this is not an append-only revision history; the Lab Sheet Part 7 evidence remains incomplete. |
 | BR-11 | The Requester Dashboard's four status counts are **mutually exclusive by current status**: "My Open Tickets" = {New, Open, Waiting for Requester, Reopened}; "In Progress" = {In Progress} only; "Resolved" = {Resolved} only; "Closed" = {Closed} only. `In Progress` is explicitly excluded from "My Open Tickets" because it has its own dedicated card — a Ticket is counted on exactly one of the four cards, never two. `Cancelled` Tickets appear on none of the four cards. |
 | BR-12 | The IT Staff Dashboard status counts are computed across all Tickets the role is authorized to see (IT Staff/Admin see all Tickets; the Requester dashboard never includes other Requesters' Tickets). The `open` count includes both `Open` and `Reopened` status Tickets, so that Reopened work is never uncounted on any card (see Assumption #13). `myAssigned` is an ownership dimension, not a status dimension, and intentionally overlaps with the status-based cards (a Ticket can be both, e.g., "Open" and "My Assigned"). |
 | BR-13 | "Recently updated" / "recently resolved" on any dashboard means within the last 7 days, ordered by `updatedAt` descending, limited to 5 items, based on Asia/Bangkok (UTC+7) calendar days. |
@@ -188,7 +188,7 @@ queries.
 
 ### 9.3 Design Decisions (justification)
 
-1. **Soft foreign key with `Restrict` delete, not cascade.** Actions Taken are audit records; a
+1. **Database-enforced foreign key with `ON DELETE RESTRICT`.** Actions Taken are audit records; a
    Ticket must not be deletable while Actions Taken exist, preventing accidental loss of work
    history. This also directly enforces BR-01: a `NOT NULL` FK means an orphaned Action Taken
    (belonging to zero Tickets) is impossible by construction, not merely by convention.
@@ -235,6 +235,24 @@ queries.
   as a UI mock in `UI-03`.
 
 ## 10. API Contract
+
+### Audit correction — 2026-10-29
+
+The Open-card drill-down uses `status=DASHBOARD_OPEN`: Staff resolves it to
+`{OPEN, REOPENED}`; Requester resolves it to `{NEW, OPEN, WAITING_FOR_REQUESTER, REOPENED}`.
+Single-status filters retain their existing meanings. `GET /api/dashboard/staff` also returns
+`recentActions`, restricted to the session user's `performedById`, within the same seven Bangkok
+calendar days, newest Action Date/Time then id first, maximum five rows (Lab Sheet Part 5).
+Ticket status writes on the canonical endpoint require `expectedUpdatedAt`. Ticket and Action
+updates compare the token in the database write itself; concurrent Action creates are serialized
+using a transaction-scoped lock on the parent Ticket. The legacy Lab 3 status endpoint retains
+its original request/response contract and does not require a client concurrency token.
+
+The approved BR-06/BR-07 resolution gate requires a legal transition, staff role, and nonempty
+summary. It does **not** require an existing Action Taken. AI-use prompt #5 and the earlier
+submission's stronger claim are not implementation evidence; this contradiction is reported
+without introducing a new business rule. Full append-only revision history and the Requester-edit
+branch of AC-14 remain gaps. No release-to-main or Kanban completion is asserted by local tests.
 
 Full detail in `api-spec.md`. Summary of new/changed endpoints:
 
@@ -314,40 +332,40 @@ Both return the current server state in `data.current` so the client can resync 
 
 ## 12. Definition of Done (Product Completion)
 
-- [ ] All FR-01…FR-15 implemented and covered by ≥1 automated test each (see `tests.md`'s
+- [x] All FR-01…FR-15 implemented and covered by ≥1 automated test each (see `tests.md`'s
       traceability note for FR-13/FR-14's explicit tags, previously implicit).
 - [ ] All BR-01…BR-17 enforced server-side (not only in UI) and covered by tests, including BR-01
       (`MIG-04`, previously untested).
-- [ ] Prisma migration applies cleanly to the Lab 3 database with zero data loss; rollback
+- [x] Prisma migration applies cleanly to the Lab 3 database with zero data loss; rollback
       verified.
-- [ ] Seed script is idempotent and produces zero/one/multiple-Actions-Taken Tickets and
+- [x] Seed script is idempotent and produces zero/one/multiple-Actions-Taken Tickets and
       zero/non-zero dashboard states, including an `In Progress` Requester Ticket for BR-11
       verification and a `Reopened` Ticket for BR-12 verification.
-- [ ] Both dashboards return only role-authorized data (AC-02, AC-08) and link to detail views.
-- [ ] Requester dashboard's four cards are verified mutually exclusive against a seeded dataset
+- [x] Both dashboards return only role-authorized data (AC-02, AC-08) and link to detail views.
+- [x] Requester dashboard's four cards are verified mutually exclusive against a seeded dataset
       (AC-13).
-- [ ] IT Staff Dashboard's "Open" card is verified to include `Reopened` Tickets against a seeded
+- [x] IT Staff Dashboard's "Open" card is verified to include `Reopened` Tickets against a seeded
       dataset (BR-12).
-- [ ] Ticket resolution gate is backend-enforced even when bypassed client-side (AC-05).
-- [ ] Optimistic-concurrency conflict handling implemented and tested, with `STALE_UPDATE` and
+- [x] Ticket resolution gate is backend-enforced even when bypassed client-side (AC-05).
+- [x] Optimistic-concurrency conflict handling implemented and tested, with `STALE_UPDATE` and
       `INVALID_TRANSITION` distinguished (AC-07, AC-05), **and** with the two `STALE_UPDATE`
       sub-cases (genuine conflict vs. self-retry) correctly distinguished in the UI by comparing
       `data.current.status` to the requested status (AC-07 vs. AC-16, §10.1).
-- [ ] Duplicate-submission protection implemented and tested for **both** endpoints covered by
+- [x] Duplicate-submission protection implemented and tested for **both** endpoints covered by
       FR-15: Action Taken creation (required `Idempotency-Key` header, missing-header rejection,
       and the server-side fallback window for a varied key — AC-10) and Ticket status changes
       (a retried, already-applied request correctly returns `STALE_UPDATE` and is resynced
       silently rather than reapplying the transition or showing a misleading conflict banner —
       AC-16).
-- [ ] `appearsResolved` reset-on-Reopen/edit behavior implemented and tested (AC-14).
-- [ ] Full Labs 1–3 regression suite passes on `main` (AC-11).
-- [ ] Zen Green visual/accessibility checklist completed for all new and modified screens.
-- [ ] Desktop/tablet/mobile screenshots captured for all Lab 4 screens; no horizontal scroll,
+- [ ] `appearsResolved` reset-on-Reopen/edit behavior implemented and tested (AC-14). Reopen is verified; Requester Ticket editing has no endpoint.
+- [ ] Full Labs 1–3 regression suite passes on `main` (AC-11). The 2026-10-29 audit tests the local `docs/lab4` working tree; remote `main` remains at the Lab 3 merge.
+- [x] Zen Green visual/accessibility checklist completed for all new and modified screens.
+- [x] Desktop/tablet/mobile screenshots captured for all Lab 4 screens; no horizontal scroll,
       clipping, or overlap.
 - [ ] README setup/seed/migration/test/demo instructions updated and verified from a clean
       clone.
-- [ ] No console errors, broken links, placeholder text, or unfinished controls remain.
-- [ ] `reviewer.md` and `ai-use.md` completed with real PR links, comments, and prompts.
+- [ ] No console errors, broken links, placeholder text, or unfinished controls remain. The audit verifies the swept screens and known internal route shapes; an exhaustive check of every application state is not established.
+- [x] `reviewer.md` and `ai-use.md` completed with real PR links, comments, and prompts.
 
 ## 13. Assumptions and Decisions
 
