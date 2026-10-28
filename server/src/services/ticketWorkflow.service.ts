@@ -1,4 +1,4 @@
-import { TicketStatus } from "@prisma/client";
+import { Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { isPermittedTransition } from "../validators/ticketStatus.validator";
 
@@ -76,6 +76,9 @@ export async function changeTicketStatus(ticketId: number, actor: Actor, body: R
     }
 
     // Optimistic concurrency, checked first (regardless of whether the transition is valid).
+    if (body.expectedUpdatedAt === undefined) {
+        return { validation: { expectedUpdatedAt: "Required." } };
+    }
     if (body.expectedUpdatedAt !== undefined) {
         const expected = new Date(String(body.expectedUpdatedAt));
         if (Number.isNaN(expected.getTime()) || expected.getTime() !== ticket.updatedAt.getTime()) {
@@ -93,31 +96,41 @@ export async function changeTicketStatus(ticketId: number, actor: Actor, body: R
         return { resolutionSummaryRequired: true as const };
     }
 
-    const updated = await prisma.ticket.update({
-        where: { id: ticketId },
-        data: {
-            currentStatus: to,
-            // BR-06/BR-07: only Resolved/Closed carry a resolution summary.
-            ...(to === "RESOLVED" || to === "CLOSED" ? { resolutionSummary: resolutionSummary || null } : {}),
-            // BR-16: Reopening clears the Requester's advisory flag as a side effect.
-            ...(to === "REOPENED" ? { appearsResolved: false } : {}),
-        },
-        select: {
-            id: true,
-            currentStatus: true,
-            resolutionSummary: true,
-            appearsResolved: true,
-            updatedAt: true,
-        },
-    });
+    try {
+        const updated = await prisma.ticket.update({
+            // Compare and write atomically: two clients cannot both consume the same token.
+            where: { id: ticketId, updatedAt: ticket.updatedAt },
+            data: {
+                currentStatus: to,
+                updatedAt: new Date(Math.max(Date.now(), ticket.updatedAt.getTime() + 1)),
+                // BR-06/BR-07: only Resolved/Closed carry a resolution summary.
+                ...(to === "RESOLVED" || to === "CLOSED" ? { resolutionSummary: resolutionSummary || null } : {}),
+                // BR-16: Reopening clears the Requester's advisory flag as a side effect.
+                ...(to === "REOPENED" ? { appearsResolved: false } : {}),
+            },
+            select: {
+                id: true,
+                currentStatus: true,
+                resolutionSummary: true,
+                appearsResolved: true,
+                updatedAt: true,
+            },
+        });
 
-    const data: StatusChangeResultData = {
-        id: updated.id,
-        status: updated.currentStatus,
-        resolutionSummary: updated.resolutionSummary,
-        appearsResolved: updated.appearsResolved,
-        updatedAt: updated.updatedAt,
-    };
+        const data: StatusChangeResultData = {
+            id: updated.id,
+            status: updated.currentStatus,
+            resolutionSummary: updated.resolutionSummary,
+            appearsResolved: updated.appearsResolved,
+            updatedAt: updated.updatedAt,
+        };
 
-    return { data };
+        return { data };
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+            const current = await prisma.ticket.findUnique({ where: { id: ticketId } });
+            return current ? { stale: true as const, current: currentState(current) } : { notFound: true as const };
+        }
+        throw error;
+    }
 }
