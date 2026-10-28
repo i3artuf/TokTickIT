@@ -27,6 +27,7 @@ export function MetricCard({ testId, label, value, to }: MetricCardProps) {
 }
 
 interface RecentTicketsPanelProps {
+    title?: string;
     testId: string;
     emptyTestId: string;
     tickets: DashboardRecentTicket[];
@@ -39,6 +40,7 @@ interface RecentTicketsPanelProps {
 /** "My Recent Tickets" list (up to 5, already ordered by the server) with an empty-state block
  * that still offers a way forward. */
 export function RecentTicketsPanel({
+    title = "My Recent Tickets",
     testId,
     emptyTestId,
     tickets,
@@ -49,7 +51,7 @@ export function RecentTicketsPanel({
     return (
         <section className="dashboard-panel" data-testid={testId}>
             <div className="dashboard-panel-header">
-                <h2 className="dashboard-panel-title">My Recent Tickets</h2>
+                <h2 className="dashboard-panel-title">{title}</h2>
                 <Link to={viewAllTo} className="dashboard-view-all">
                     View all
                 </Link>
