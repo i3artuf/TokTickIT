@@ -54,3 +54,4 @@ artifacts/lab-*/audit-*/
 .attachments-storage/
 
 e2e/audit-lab4.spec.ts
+scripts/
