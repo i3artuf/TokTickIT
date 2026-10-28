@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { dashboardStatusFilter } from "../utils/dashboardFilters";
 import { getNextTicketNumberBase, getHighestTicketSequence, buildCandidateTicketNumber, isTicketNumberUniqueViolation } from "./ticketNumber.service";
 import { CreateTicketInput } from "../validators/ticket.validator";
 
@@ -119,7 +120,7 @@ export async function listTickets(options: ListTicketsOptions) {
     }
 
     if (options.status) {
-        where.currentStatus = options.status;
+        where.currentStatus = dashboardStatusFilter(options.status, "requester");
     }
 
     if (options.search && options.search.trim() !== "") {
