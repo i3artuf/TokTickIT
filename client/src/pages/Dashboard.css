@@ -34,6 +34,17 @@
     outline-offset: 2px;
 }
 
+.dashboard-refresh {
+    --bs-btn-color: var(--color-primary, #006b3c);
+    --bs-btn-border-color: var(--color-primary, #006b3c);
+    --bs-btn-hover-color: #ffffff;
+    --bs-btn-hover-bg: var(--color-primary, #006b3c);
+    --bs-btn-hover-border-color: var(--color-primary, #006b3c);
+    --bs-btn-active-color: #ffffff;
+    --bs-btn-active-bg: var(--color-primary, #006b3c);
+    --bs-btn-active-border-color: var(--color-primary, #006b3c);
+}
+
 .dashboard-cards {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
