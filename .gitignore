@@ -1,7 +1,7 @@
 # Dependencies
 node_modules/
 .pnpm-store/
-.vite
+.vite/
 
 # Build outputs
 dist/
@@ -29,12 +29,28 @@ logs/
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Storage / Uploads
+# Storage / Uploads (runtime-generated, not versioned)
 storage/
 server/storage/
 .attachments-storage/
 
-# Playwright test outputs
+# Playwright test outputs (generated at runtime)
 playwright-report/
 test-results/
+server/test-results/
+
+# Local audit & submission tooling
+.audit-tools/
+.freebuff/
+__pycache__/
+*.pyc
+
+# Submission documents
+artifacts/lab-*/audit-*/
+
+# AI agent attachment storage (conversation blobs)
+.attachments-storage/
+
+e2e/audit-lab4.spec.ts
