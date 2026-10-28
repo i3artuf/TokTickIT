@@ -56,7 +56,12 @@ test.describe("Lab 3 IT Staff Ticket Flow E2E", () => {
         // 3. AC-28: change IT Priority MEDIUM -> HIGH; Requested Priority stays MEDIUM
         const prioritySelect = page.getByTestId("staff-ticket-priority-select");
         await prioritySelect.selectOption("HIGH");
+        const prioritySaved = page.waitForResponse(response =>
+            response.url().includes("/it-priority") && response.request().method() === "PATCH");
         await page.getByRole("button", { name: "Save" }).first().click();
+        const priorityResponse = await prioritySaved;
+        expect(priorityResponse.status()).toBe(200);
+        const savedPriority = await priorityResponse.json();
         await expect(prioritySelect).toHaveValue("HIGH");
         // The priority update also bumps the Ticket's concurrency token. Wait for the save to
         // settle (the Save control only disappears once the response has been applied) so the
@@ -68,7 +73,10 @@ test.describe("Lab 3 IT Staff Ticket Flow E2E", () => {
         //    immediately on selection (no separate Save step) and updates the summary badge
         //    from the response.
         const statusSelect = page.getByTestId("staff-ticket-status-select");
+        const statusRequest = page.waitForRequest(request =>
+            /\/api\/tickets\/\d+\/status$/.test(request.url()) && request.method() === "PATCH");
         await statusSelect.selectOption("OPEN");
+        expect((await statusRequest).postDataJSON().expectedUpdatedAt).toBe(savedPriority.data.updatedAt);
         await expect(page.getByTestId("ticket-status-badge")).toHaveText("Open");
         await expect(statusSelect).toHaveValue("OPEN");
 
