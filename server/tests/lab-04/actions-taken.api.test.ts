@@ -53,6 +53,63 @@ describe("Actions Taken API (API-01..08, API-18..20, API-23, API-27, WF-03)", ()
         return req.send(body);
     }
 
+    it("AUDIT-ACT-01: simultaneous identical submissions with same and varied keys each create exactly one action", async () => {
+        for (const variedKey of [false, true]) {
+            const ticket = await createTicket();
+            const body = { description: "Concurrent action", result: "One row only" };
+            const responses = await Promise.all([
+                postAction(ticket.id, body, samiraToken, `audit-first-${ticket.id}`),
+                postAction(ticket.id, body, samiraToken, `${variedKey ? 'audit-second' : 'audit-first'}-${ticket.id}`),
+            ]);
+            expect(responses.map(r => r.status).sort()).toEqual([200, 201]);
+            expect(responses[0].body.data.id).toBe(responses[1].body.data.id);
+            expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
+        }
+    });
+
+    it("AUDIT-ACT-02: simultaneous action edits reject one writer without losing the winner's data", async () => {
+        const ticket = await createTicket();
+        const created = await postAction(ticket.id, { description: "Original", result: "Original" }, samiraToken, `audit-edit-${ticket.id}`);
+        const action = created.body.data;
+        const edit = (description: string) => request(app)
+            .patch(`/api/tickets/${ticket.id}/actions/${action.id}`)
+            .set("Cookie", `toktickit_session=${samiraToken}`)
+            .send({ description, expectedUpdatedAt: action.updatedAt });
+        const responses = await Promise.all([edit("First writer"), edit("Second writer")]);
+        expect(responses.map(r => r.status).sort()).toEqual([200, 409]);
+        const winner = responses.find(r => r.status === 200)!;
+        const loser = responses.find(r => r.status === 409)!;
+        expect(loser.body.error.code).toBe("STALE_UPDATE");
+        expect(loser.body.error.data.current.description).toBe(winner.body.data.description);
+        expect((await prisma.actionTaken.findUnique({ where: { id: action.id } }))!.description).toBe(winner.body.data.description);
+    });
+
+    it("AUDIT-ACT-03: list order is stable for equal timestamps and edits cannot change creation time or performer", async () => {
+        const ticket = await createTicket();
+        const records = [];
+        for (const time of ["2026-09-01T01:00:00Z", "2026-09-02T01:00:00Z", "2026-09-02T01:00:00Z"]) {
+            records.push(await prisma.actionTaken.create({ data: {
+                ticketId: ticket.id, performedById: staffSamira.id,
+                actionDateTime: new Date(time), description: "Ordering fixture", result: "Recorded",
+            } }));
+        }
+        const list = () => request(app).get(`/api/tickets/${ticket.id}/actions`)
+            .set("Cookie", `toktickit_session=${aliceToken}`);
+        const before = await list();
+        const expectedIds = [...records].reverse().map(a => a.id);
+        expect(before.status).toBe(200);
+        expect(before.body.data.map((a: any) => a.id)).toEqual(expectedIds);
+        const newest = records[2];
+        const edited = await request(app).patch(`/api/tickets/${ticket.id}/actions/${newest.id}`)
+            .set("Cookie", `toktickit_session=${samiraToken}`)
+            .send({ description: "Corrected text", expectedUpdatedAt: newest.updatedAt.toISOString(),
+                actionDateTime: "2030-01-01T00:00:00Z", performedById: staffMarcus.id });
+        expect(edited.status).toBe(200);
+        expect(edited.body.data.actionDateTime).toBe(newest.actionDateTime.toISOString());
+        expect(edited.body.data.performedBy.id).toBe(staffSamira.id);
+        expect((await list()).body.data.map((a: any) => a.id)).toEqual(expectedIds);
+    });
+
     beforeAll(async () => {
         requesterAlice = await prisma.user.findFirst({ where: { email: "alice.tanaka@example.com" } });
         requesterBob = await prisma.user.findFirst({ where: { email: "bob.chavez@example.com" } });
