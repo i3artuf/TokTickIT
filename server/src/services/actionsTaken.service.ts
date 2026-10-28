@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { Prisma } from "@prisma/client";
 import { normalizeAndValidate } from "../validators/actionsTaken.validator";
 
 export const EDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -78,28 +79,32 @@ export async function createAction(
     body: Record<string, unknown>,
     idempotencyKey: string
 ) {
-    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-    if (!ticket) return { notFound: true as const };
+    // Serialize creates for this Ticket so both same-key and varied-key retries are safe
+    // when they arrive together. The lock and insertion share one database transaction.
+    return prisma.$transaction(async tx => {
+        await tx.$queryRaw`SELECT "id" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
+        const ticket = await tx.ticket.findUnique({ where: { id: ticketId } });
+        if (!ticket) return { notFound: true as const };
 
-    if (ticket.currentStatus === "CANCELLED") {
-        return { cancelled: true as const };
-    }
+        if (ticket.currentStatus === "CANCELLED") {
+            return { cancelled: true as const };
+        }
 
-    const normalized = normalizeAndValidate(body);
-    if (Object.keys(normalized.fields).length > 0) {
-        return { validation: normalized.fields };
-    }
+        const normalized = normalizeAndValidate(body);
+        if (Object.keys(normalized.fields).length > 0) {
+            return { validation: normalized.fields };
+        }
 
-    const byKey = await prisma.actionTaken.findFirst({
-        where: { ticketId, idempotencyKey },
-        select: actionSelect,
+        const byKey = await tx.actionTaken.findFirst({
+            where: { ticketId, idempotencyKey },
+            select: actionSelect,
     });
     if (byKey) {
         return { data: toResponse(byKey), replayed: true as const };
     }
 
     const fallbackSince = new Date(Date.now() - FALLBACK_DEDUP_WINDOW_MS);
-    const byContent = await prisma.actionTaken.findFirst({
+    const byContent = await tx.actionTaken.findFirst({
         where: {
             ticketId,
             performedById: actor.userId,
@@ -114,7 +119,7 @@ export async function createAction(
         return { data: toResponse(byContent), replayed: true as const };
     }
 
-    const created = await prisma.actionTaken.create({
+    const created = await tx.actionTaken.create({
         data: {
             ticketId,
             actionDateTime: new Date(),
@@ -130,6 +135,7 @@ export async function createAction(
     });
 
     return { data: toResponse(created), replayed: false as const };
+    });
 }
 
 export async function updateAction(
@@ -166,17 +172,26 @@ export async function updateAction(
         return { validation: normalized.fields };
     }
 
-    const updated = await prisma.actionTaken.update({
-        where: { id: actionId },
-        data: {
-            description: normalized.description,
-            result: normalized.result,
-            followUpRequired: normalized.followUpRequired,
-            followUpNote: normalized.followUpNote,
-            attachmentNotes: normalized.attachmentNotes,
-        },
-        select: actionSelect,
-    });
+    try {
+        const updated = await prisma.actionTaken.update({
+            where: { id: actionId, updatedAt: expected },
+            data: {
+                updatedAt: new Date(Math.max(Date.now(), action.updatedAt.getTime() + 1)),
+                description: normalized.description,
+                result: normalized.result,
+                followUpRequired: normalized.followUpRequired,
+                followUpNote: normalized.followUpNote,
+                attachmentNotes: normalized.attachmentNotes,
+            },
+            select: actionSelect,
+        });
 
-    return { data: toResponse(updated) };
+        return { data: toResponse(updated) };
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+            const current = await prisma.actionTaken.findFirst({ where: { id: actionId, ticketId }, select: actionSelect });
+            return current ? { stale: true as const, current: toResponse(current) } : { notFound: true as const };
+        }
+        throw error;
+    }
 }
