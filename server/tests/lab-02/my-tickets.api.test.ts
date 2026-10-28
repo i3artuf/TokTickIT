@@ -13,6 +13,7 @@ let relatedSystemId: number;
 // Session tokens signed for each test user
 let tokenA: string;
 let tokenB: string;
+let fixtureSequence = 1000;
 
 async function createTicket(overrides: Partial<{
     requesterId: number;
@@ -27,7 +28,7 @@ async function createTicket(overrides: Partial<{
 }>) {
     return prisma.ticket.create({
         data: {
-            ticketNumber: overrides.ticketNumber ?? `TK-20260904-${Math.floor(Math.random() * 9000 + 1000)}`,
+            ticketNumber: overrides.ticketNumber ?? `TK-20260904-${++fixtureSequence}`,
             requesterId: overrides.requesterId ?? requesterA,
             categoryId: overrides.categoryId ?? hardwareCategoryId,
             relatedSystemId,
