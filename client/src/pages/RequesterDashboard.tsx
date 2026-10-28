@@ -27,7 +27,7 @@ export function RequesterDashboard() {
     const firstName = user?.name?.split(" ")[0] ?? "";
 
     return (
-        <div className="dashboard-page" data-testid="requester-dashboard">
+        <main className="dashboard-page" data-testid="requester-dashboard">
             <DashboardHeader
                 title={`Welcome${firstName ? `, ${firstName}` : ""}!`}
                 subtitle="Track the support requests you have raised."
@@ -52,7 +52,7 @@ export function RequesterDashboard() {
                             testId="requester-dashboard-card-open"
                             label="My Open Tickets"
                             value={data.counts.open}
-                            to="/my-tickets"
+                            to="/my-tickets?status=DASHBOARD_OPEN"
                         />
                         <MetricCard
                             testId="requester-dashboard-card-in-progress"
@@ -101,6 +101,6 @@ export function RequesterDashboard() {
                     </DashboardContent>
                 </>
             )}
-        </div>
+        </main>
     );
 }
