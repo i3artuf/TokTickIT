@@ -63,5 +63,4 @@ adb8c54ff8e3cf1640b53be3d5a77e56f4ec5528 (Lab 3 PR #52); its complete Git tree h
 no lab-04 paths. Issues #53–58 are closed, but their Project Done fields were not
 verified. Do not describe Lab 4 as released to main or the Kanban as completed.
 
-See verified-audit.md and artifacts/lab-04/audit-2026-10-29/ for current results,
-the genuine raw review/comment records, traceability and remaining blockers.
+Review records and historical peer approvals are tracked in the pull requests linked above.

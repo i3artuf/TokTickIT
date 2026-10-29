@@ -27,7 +27,7 @@ $$\text{React 18 (Vite + TS)} \longleftrightarrow \text{Express REST API (RBAC +
   - Concurrency & Reliability: atomic timestamp checks on canonical Ticket status and Action edits (`expectedUpdatedAt` / `STALE_UPDATE`), client-supplied `Idempotency-Key` headers with a 5-second database-backed deduplication fallback serialized by a parent-Ticket transaction lock (BR-17)
   - Storage: Multer with UUID-based local file storage for ticket attachments
 - **Testing & Quality Assurance**:
-  - Unit & Integration: Vitest, React Testing Library, Supertest. Audited counts recorded in [`docs/lab-04/verified-audit.md`](docs/lab-04/verified-audit.md) and machine-readable execution reports.
+  - Unit & Integration: Vitest, React Testing Library, Supertest. Comprehensive test suites and execution logs are recorded in [docs/lab-04/tests.md](docs/lab-04/tests.md).
   - End-to-End & Responsive: Playwright (`e2e/lab-04/`) across 3 viewports (Desktop 1280px, Tablet 820px, Mobile 375px)
   - Visual Evidence: Automated screenshot capture suite (`artifacts/lab-04/screenshots/`)
 
@@ -63,7 +63,7 @@ toktickit/
 │   ├── lab-02/                      # Requester workflow regression
 │   ├── lab-03/                      # Authentication, staff queue, and user administration regression
 │   └── lab-04/                      # Actions Taken, dashboards, ticket resolution, and screenshot specs
-├── docs/                            # Engineering specifications & audit artifacts
+├── docs/                            # Engineering specifications & documentation
 │   ├── lab-02/
 │   ├── lab-03/
 │   └── lab-04/                      # specification.md, api-spec.md, ui-spec.md, tests.md, reviewer.md, ai-use.md
@@ -71,8 +71,7 @@ toktickit/
 │   ├── lab-02/screenshots/
 │   ├── lab-03/screenshots/
 │   └── lab-04/
-│       ├── screenshots/             # Multi-viewport screenshot evidence (desktop, tablet, mobile)
-│       └── audit-2026-10-29/        # Dated audit run — logs, JSON reports, quality gate, traceability CSV
+│       └── screenshots/             # Multi-viewport screenshot evidence (desktop, tablet, mobile)
 ├── scripts/                         # Utility scripts (build_submission_docs.py, etc.)
 ├── playwright.config.ts
 └── README.md
