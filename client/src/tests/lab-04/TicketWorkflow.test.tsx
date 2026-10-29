@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { TicketWorkflow } from "../../components/TicketWorkflow";
 import * as workflowApi from "../../api/ticketWorkflow.api";
 import { TicketWorkflowApiError } from "../../api/ticketWorkflow.api";
+import { useLayoutEffect, useState } from "react";
 
 // Ref: docs/lab-04/ui-spec.md §4 (Ticket Status Control), §7 (data-testids), §5
 // Ref: docs/lab-04/specification.md §5.1 (matrix), §10.1 (STALE_UPDATE client branching), FR-07, AC-07, AC-16
@@ -43,6 +44,29 @@ async function submitResolved() {
 }
 
 describe("TicketWorkflow status control (UI-07, UI-08, UI-10, UI-11)", () => {
+    it("AUDIT-WF-UI-01: an immediate transition after a parent refresh uses the new token before passive effects", async () => {
+        const fresh = "2026-09-27T11:00:00.000Z";
+        const change = vi.spyOn(workflowApi, "changeTicketStatus").mockResolvedValue({
+            id: TICKET_ID, status: "OPEN", updatedAt: "2026-09-27T11:01:00.000Z",
+            resolutionSummary: null, appearsResolved: false,
+        });
+        function ParentRefresh() {
+            const [token, setToken] = useState(UPDATED_AT);
+            useLayoutEffect(() => {
+                if (token === fresh) {
+                    fireEvent.change(screen.getByTestId("ticket-status-select"), { target: { value: "OPEN" } });
+                }
+            }, [token]);
+            return <>
+                <button onClick={() => setToken(fresh)}>Priority saved</button>
+                <TicketWorkflow ticketId={TICKET_ID} status="NEW" role="IT_STAFF" updatedAt={token} />
+            </>;
+        }
+        render(<ParentRefresh />);
+        fireEvent.click(screen.getByRole("button", { name: "Priority saved" }));
+        await waitFor(() => expect(change).toHaveBeenCalledWith(TICKET_ID, { status: "OPEN", expectedUpdatedAt: fresh }));
+        expect(await screen.findByTestId("ticket-status-badge")).toHaveTextContent("Open");
+    });
     it("UI-07: only role/status-valid options render — never disabled; no control at all when none are valid (FR-07)", () => {
         // IT Staff on a New Ticket: Open and Cancelled are valid; Resolved/Closed are not.
         const staff = renderWorkflow({ status: "NEW", role: "IT_STAFF" });

@@ -1,4 +1,5 @@
 import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 import { fetchStaffDashboard } from "../api/dashboard.api";
 import {
     DashboardContent,
@@ -25,7 +26,7 @@ export function StaffDashboard() {
     const firstName = user?.name?.split(" ")[0] ?? "";
 
     return (
-        <div className="dashboard-page" data-testid="staff-dashboard">
+        <main className="dashboard-page" data-testid="staff-dashboard">
             <DashboardHeader
                 title={`Welcome back${firstName ? `, ${firstName}` : ""}!`}
                 subtitle="Here is what needs your attention across the service desk."
@@ -53,7 +54,7 @@ export function StaffDashboard() {
                             testId="staff-dashboard-card-open"
                             label="Open"
                             value={data.counts.open}
-                            to="/staff/queue?status=OPEN"
+                            to="/staff/queue?status=DASHBOARD_OPEN"
                         />
                         <MetricCard
                             testId="staff-dashboard-card-in-progress"
@@ -77,11 +78,12 @@ export function StaffDashboard() {
 
                     <DashboardContent>
                         <RecentTicketsPanel
+                            title="Recent Tickets"
                             testId="staff-dashboard-recent-tickets"
                             emptyTestId="staff-dashboard-recent-tickets-empty"
                             tickets={data.recentTickets}
                             detailPath={(id) => `/staff/tickets/${id}`}
-                            viewAllTo="/staff/queue?owner=me"
+                            viewAllTo="/staff/queue"
                             emptyCta={{ to: "/staff/queue", label: "Browse the queue" }}
                         />
 
@@ -100,8 +102,32 @@ export function StaffDashboard() {
                             />
                         </QuickActions>
                     </DashboardContent>
+                    <section className="dashboard-panel" data-testid="staff-dashboard-recent-actions">
+                        <div className="dashboard-panel-header">
+                            <h2 className="dashboard-panel-title">My Recent Actions Taken</h2>
+                        </div>
+                        {(data.recentActions ?? []).length === 0 ? (
+                            <p className="dashboard-empty" data-testid="staff-dashboard-recent-actions-empty">
+                                No actions recorded by you in the last 7 days.
+                            </p>
+                        ) : (
+                            <ul className="dashboard-recent-list">
+                                {data.recentActions!.map(action => (
+                                    <li key={action.id}>
+                                        <Link className="dashboard-recent-row" to={`/staff/tickets/${action.ticketId}`}>
+                                            <span className="dashboard-recent-number">{action.ticket.ticketNumber}</span>
+                                            <span className="dashboard-recent-summary">{action.description}</span>
+                                            <time dateTime={action.actionDateTime}>
+                                                {new Date(action.actionDateTime).toLocaleString("en-GB", { timeZone: "Asia/Bangkok" })}
+                                            </time>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
                 </>
             )}
-        </div>
+        </main>
     );
 }

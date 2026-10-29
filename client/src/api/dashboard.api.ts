@@ -27,6 +27,14 @@ export interface RequesterDashboardCounts {
 export interface StaffDashboardData {
     counts: StaffDashboardCounts;
     recentTickets: DashboardRecentTicket[];
+    recentActions?: {
+        id: number;
+        ticketId: number;
+        description: string;
+        result: string;
+        actionDateTime: string;
+        ticket: { ticketNumber: string };
+    }[];
 }
 
 export interface RequesterDashboardData {

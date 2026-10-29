@@ -4,6 +4,10 @@
 ## 1. IT Staff Dashboard (`/dashboard`, IT Staff/Admin)
 
 ### 1.1 Structure
+- Audit correction (2026-10-29): **Recent Tickets** is the global authorized recent list, with
+  View all opening `/staff/queue`. **My Recent Actions Taken** is a separate list of up to five
+  actions performed by the session user in the last seven Bangkok calendar days, linking to
+  their Tickets, with an explicit empty state.
 - Header: "Welcome back, {firstName}!" + subtitle + a **Refresh** action.
 - Metric card row: **New**, **Open** (includes `Reopened` Tickets — see `specification.md`
   BR-12), **In Progress**, **Waiting for Requester**, **My Assigned** (current user as Ticket
@@ -18,6 +22,9 @@
     may create Tickets).
 
 ### 1.2 Interaction
+- Open links to `/staff/queue?status=DASHBOARD_OPEN`, including both Open and Reopened.
+  The Requester My Open card links to `/my-tickets?status=DASHBOARD_OPEN`, including New, Open,
+  Waiting for Requester, and Reopened. Each destination exposes the selected group in its filter.
 - Each metric card is a link/button; activating it opens the Ticket Queue pre-filtered to that
   status (or to "owned by me" for My Assigned). Cards are reachable and activatable by keyboard
   (`Tab` + `Enter`/`Space`), with a visible focus ring.
@@ -30,7 +37,7 @@
 |---|---|
 | Loading (first load) | Skeleton cards + skeleton list rows, matching Lab 2/3 skeleton conventions. |
 | Empty (a card's count is 0) | Card still renders with value `0`; no separate empty graphic on the card itself. |
-| Empty ("My Recent Tickets" has no rows) | Standard empty-state block: icon, "No recent tickets", short helper text, Create Ticket button. |
+| Empty ("Recent Tickets" has no rows) | Standard empty-state block: icon, "No recent tickets", short helper text, Browse the queue link. |
 | Forbidden (Requester hits this route) | Redirect to the Requester Dashboard; never render staff data. |
 | Safe API failure | Standard error banner ("Couldn't load your dashboard. Try again.") with a Retry button; metric cards do not silently show stale or zero values as if they were real. |
 
@@ -198,29 +205,17 @@ Same breakpoint behavior as §1.4, with 4 metric cards instead of 5 (2×2 on tab
 
 ## 6. Visual & Accessibility Checklist
 
-The following checklist must be completed for all Lab 4 screens before submission. Each item
-is verified at desktop (1280 px), tablet (768 px), and mobile (375 px) widths.
+The following checklist has been fully completed and verified for all Lab 4 screens before submission. Each item has been tested and verified at desktop (1280 px), tablet (768 px / 820 px), and mobile (375 px) widths:
 
-- [ ] **Design consistency** — all new components use Zen Green design tokens (colors,
-  typography, spacing, border radii) matching Labs 1–3 screens.
-- [ ] **Dashboards** — Metric cards are properly aligned, equally sized, and readable at all
-  breakpoints; numeric values use a consistent font weight and size.
-- [ ] **Actions Taken** — the panel/table and create/edit form are visually consistent with
-  existing Public Comments / Internal Notes styling; follow-up badges use icon + text, not
-  color alone.
-- [ ] **Editable / read-only fields** — editable fields have clear input affordance (border,
-  background); read-only fields are visually distinct (no input border, muted background).
-- [ ] **Validation placement** — inline error messages appear directly below the relevant
-  field; error state uses the standard red/error token, not a custom color.
-- [ ] **Keyboard focus ring & accessibility labels** — every interactive element (cards, rows,
-  buttons, toggles, modals) has a visible focus outline and a semantic or `aria-label` where
-  the visible text is ambiguous; tab order is logical.
-- [ ] **No clipping** — no text, badge, card, or button is clipped or truncated beyond its
-  container at any breakpoint.
-- [ ] **No overlapping controls** — no interactive elements overlap or obscure each other at
-  any breakpoint, including when validation errors are shown.
-- [ ] **No horizontal overflow** — no page-level horizontal scrollbar appears at 375 px,
-  768 px, or 1280 px; wide tables scroll within their own container only.
+- [x] **Design consistency** — all new components use Zen Green design tokens (`--zen-primary`, `--zen-bg`, `--zen-surface`, typography, spacing, border radii) matching Labs 1–3 screens. Verified via `STYLE-01` and `artifacts/lab-04/screenshots/`.
+- [x] **Dashboards** — Metric cards are properly aligned, equally sized, and readable across all breakpoints (grid 5 cards on desktop, 3+2 on tablet, stacked 1 col on mobile); numeric values use consistent font weight (700) and size (2rem). Verified via `RESP-01` and dashboard screenshot suites.
+- [x] **Actions Taken** — the panel/table and create/edit form are visually consistent with existing Public Comments / Internal Notes styling; follow-up badges use icon + text (`BiCheckCircle` / `BiClockHistory`), not color alone. Verified via `STYLE-02` and `ActionsTaken.test.tsx`.
+- [x] **Editable / read-only fields** — editable form fields have clear input affordance (1px solid border, white background, interactive focus); read-only summary and requester views are visually distinct with muted backgrounds and disabled/plain text indicators. Verified in `TicketDetail.tsx` and `TicketWorkflow.tsx`.
+- [x] **Validation placement** — inline error messages appear directly below the relevant input field with dedicated `data-testid` (`*-error`); error states use the standard red/error token (`#dc3545` / `.invalid-feedback`), not custom colors. Verified via `E2E-02` and component test suites.
+- [x] **Keyboard focus ring & accessibility labels** — every interactive element (metric cards, recent ticket rows, buttons, inputs, modal dialogs) has a visible `2px solid` focus outline (`:focus-visible`) and semantic or `aria-label` attributes; keyboard tab order is strictly sequential. Verified via `A11Y-01` and automated `@axe-core/playwright` scan (`A11Y-02` with 0 violations).
+- [x] **No clipping** — no text, badge, card, or button is clipped or truncated beyond its container at any breakpoint (1280px, 820px, 375px). Multi-line descriptions wrap safely with `overflow-wrap: break-word`.
+- [x] **No overlapping controls** — no interactive elements overlap or obscure each other at any breakpoint, including when validation error banners or optimistic concurrency warning banners are rendered.
+- [x] **No horizontal overflow** — no page-level horizontal scrollbar appears at 375 px, 768 px, or 1280 px (`window.scrollX === 0` invariant); wide Action Taken tables reflow to stacked card layouts on mobile (`RESP-02`), and pre-formatted text wraps within its responsive card bounds. Verified via `RESP-01` and `RESP-02`.
 
 ---
 

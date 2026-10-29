@@ -1,6 +1,8 @@
 import { TicketStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { recentWindowStart } from "../utils/dashboardDates";
+import { REQUESTER_OPEN_STATUSES, STAFF_OPEN_STATUSES } from "../utils/dashboardFilters";
+export { REQUESTER_OPEN_STATUSES, STAFF_OPEN_STATUSES } from "../utils/dashboardFilters";
 
 // Ref: docs/lab-04/specification.md §10 (Dashboard Contract), BR-11, BR-12, BR-13,
 //      FR-10, FR-11, AC-02, AC-09, AC-13, AC-15, Assumptions #6/#7/#12/#13
@@ -9,15 +11,8 @@ import { recentWindowStart } from "../utils/dashboardDates";
 // Both dashboards return SUMMARY data only — never a full Ticket collection.
 
 /** BR-11: the Requester Dashboard's "My Open Tickets" bucket. In Progress has its own card. */
-export const REQUESTER_OPEN_STATUSES: TicketStatus[] = [
-    "NEW",
-    "OPEN",
-    "WAITING_FOR_REQUESTER",
-    "REOPENED",
-];
 
 /** BR-12: the IT Staff Dashboard's "Open" bucket counts Open AND Reopened. */
-export const STAFF_OPEN_STATUSES: TicketStatus[] = ["OPEN", "REOPENED"];
 
 /** BR-13: recent lists are capped at the 5 most recently updated Tickets. */
 export const RECENT_TICKETS_LIMIT = 5;
@@ -101,13 +96,22 @@ export interface StaffDashboardCounts {
  * (Assumption #6).
  */
 export async function getStaffDashboard(actorUserId: number, now: Date = new Date()) {
-    const [newCount, open, inProgress, waitingForRequester, myAssigned, recent] = await Promise.all([
+    const [newCount, open, inProgress, waitingForRequester, myAssigned, recent, recentActions] = await Promise.all([
         prisma.ticket.count({ where: { currentStatus: "NEW" } }),
         prisma.ticket.count({ where: { currentStatus: { in: STAFF_OPEN_STATUSES } } }),
         prisma.ticket.count({ where: { currentStatus: "IN_PROGRESS" } }),
         prisma.ticket.count({ where: { currentStatus: "WAITING_FOR_REQUESTER" } }),
         prisma.ticket.count({ where: { ownerId: actorUserId } }),
         recentTicketsQuery({}, now),
+        prisma.actionTaken.findMany({
+            where: { performedById: actorUserId, actionDateTime: { gte: recentWindowStart(now) } },
+            orderBy: [{ actionDateTime: "desc" }, { id: "desc" }],
+            take: RECENT_TICKETS_LIMIT,
+            select: {
+                id: true, ticketId: true, description: true, result: true, actionDateTime: true,
+                ticket: { select: { ticketNumber: true } },
+            },
+        }),
     ]);
 
     return {
@@ -119,5 +123,6 @@ export async function getStaffDashboard(actorUserId: number, now: Date = new Dat
             myAssigned,
         } satisfies StaffDashboardCounts,
         recentTickets: recent.map(toRecentTicket),
+        recentActions,
     };
 }

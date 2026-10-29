@@ -54,7 +54,17 @@ export function TicketWorkflow({
     // BR-14 token: every successful response (and every error that carries `current`)
     // refreshes this, so a second change from the same mounted control is not rejected as
     // a stale update. Props are re-synced below so a parent refresh still takes effect.
-    const [currentUpdatedAt, setCurrentUpdatedAt] = useState(updatedAt);
+    const [version, setVersion] = useState({ ticketId, prop: updatedAt, token: updatedAt });
+    // Synchronize derived state before committing a parent refresh. A passive effect leaves
+    // a window in which a priority/ownership save is visible but this control still sends
+    // its previous token. React immediately rerenders this component for the adjustment.
+    if (version.ticketId !== ticketId || version.prop !== updatedAt) {
+        setVersion({ ticketId, prop: updatedAt, token: updatedAt });
+    }
+    const currentUpdatedAt = version.token;
+    function setCurrentUpdatedAt(token: string | undefined) {
+        setVersion(previous => ({ ...previous, token }));
+    }
     const [pending, setPending] = useState<TicketStatus | null>(null);
     const [resolutionSummary, setResolutionSummary] = useState("");
     const [fieldError, setFieldError] = useState("");
@@ -69,7 +79,6 @@ export function TicketWorkflow({
     // Keep the local view in step with the server-derived props on a parent refresh,
     // without clobbering a local resync that the parent has not picked up yet.
     useEffect(() => setCurrentStatus(status), [status]);
-    useEffect(() => setCurrentUpdatedAt(updatedAt), [updatedAt]);
     useEffect(() => setFlag(appearsResolved), [appearsResolved]);
 
     const statusEnum = currentStatus as TicketStatus;

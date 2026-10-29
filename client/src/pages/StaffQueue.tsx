@@ -187,6 +187,7 @@ export function StaffQueue() {
                                 }}
                             >
                                 <option value="">All Statuses</option>
+                                <option value="DASHBOARD_OPEN">Open and Reopened</option>
                                 <option value="NEW">New</option>
                                 <option value="OPEN">Open</option>
                                 <option value="IN_PROGRESS">In Progress</option>

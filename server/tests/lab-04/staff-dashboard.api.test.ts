@@ -44,6 +44,35 @@ describe("IT Staff dashboard API (API-16, API-26)", () => {
         };
     }
 
+    it("AUDIT-DASH-01: Open drill-down matches the card count and excludes unrelated statuses", async () => {
+        const dashboard = await getStaffDashboard(samiraToken);
+        const queue = await request(app).get("/api/staff/tickets?status=DASHBOARD_OPEN&pageSize=50")
+            .set("Cookie", `toktickit_session=${samiraToken}`);
+        expect(queue.status).toBe(200);
+        expect(queue.body.meta.totalCount).toBe(dashboard.body.data.counts.open);
+        expect(queue.body.data.length).toBeGreaterThan(0);
+        expect(queue.body.data.every((t: any) => ["OPEN", "REOPENED"].includes(t.currentStatus))).toBe(true);
+        expect(queue.body.data.some((t: any) => t.currentStatus === "REOPENED")).toBe(true);
+    });
+
+    it("AUDIT-DASH-02: recent actions are scoped to the session performer and link to real Tickets", async () => {
+        const ticket = await prisma.ticket.findFirst();
+        const action = await prisma.actionTaken.create({ data: {
+            ticketId: ticket!.id, performedById: samira.id, actionDateTime: new Date(),
+            description: "Audit dashboard action", result: "Visible to its performer",
+        } });
+        try {
+            const own = await getStaffDashboard(samiraToken);
+            const other = await getStaffDashboard(emptyStaffToken);
+            expect(own.body.data.recentActions.some((a: any) => a.id === action.id)).toBe(true);
+            expect(own.body.data.recentActions.length).toBeLessThanOrEqual(5);
+            expect(own.body.data.recentActions.find((a: any) => a.id === action.id).ticket.ticketNumber).toBe(ticket!.ticketNumber);
+            expect(other.body.data.recentActions).toEqual([]);
+        } finally {
+            await prisma.actionTaken.delete({ where: { id: action.id } });
+        }
+    });
+
     beforeAll(async () => {
         // Lab 2 suites wipe all Tickets mid-run; restore the Issue 2 baseline first so the
         // BR-12 assertion below runs against the real seeded Reopened Ticket.

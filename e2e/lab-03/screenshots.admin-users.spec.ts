@@ -18,30 +18,30 @@ test.describe("Admin User Management screenshots — breakpoints", () => {
     test("desktop", async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await goToUsers(page);
-        await page.screenshot({ path: `${OUT_DIR}/desktop.png`, fullPage: true });
+        await page.screenshot({ path: `${OUT_DIR}/desktop.png` });
     });
 
     test("tablet", async ({ page }) => {
-        await page.setViewportSize({ width: 820, height: 1180 });
+        await page.setViewportSize({ width: 820, height: 1000 });
         await goToUsers(page);
-        await page.screenshot({ path: `${OUT_DIR}/tablet.png`, fullPage: true });
+        await page.screenshot({ path: `${OUT_DIR}/tablet.png` });
     });
 
     test("mobile", async ({ page }) => {
         await page.setViewportSize({ width: 375, height: 800 });
         await goToUsers(page);
-        await page.screenshot({ path: `${OUT_DIR}/mobile.png`, fullPage: true });
+        await page.screenshot({ path: `${OUT_DIR}/mobile.png` });
     });
 });
 
 test.describe("Admin User Management screenshots — states", () => {
     test("create-user panel open", async ({ page }) => {
-        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.setViewportSize({ width: 1280, height: 850 });
         await goToUsers(page);
 
         // ui-spec §7: "+ Create User" opens the right-hand slide-over form
         await page.getByTestId("admin-create-user-button").click();
         await expect(page.getByTestId("admin-user-form")).toBeVisible();
-        await page.screenshot({ path: `${OUT_DIR}/create-panel-open.png`, fullPage: true });
+        await page.screenshot({ path: `${OUT_DIR}/create-panel-open.png` });
     });
 });

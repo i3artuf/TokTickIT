@@ -14,7 +14,7 @@ const STAFF_EMAIL = "samira.chen@example.com";
 const ADMIN_EMAIL = "alex.morgan@example.com";
 const REQUESTER_EMAIL = "alice.tanaka@example.com";
 
-const ROOT = "artifacts/lab-04/screenshots";
+const ROOT = process.env.LAB4_SCREENSHOT_ROOT ?? "artifacts/lab-04/screenshots";
 // ui-spec.md §6 names the three widths the checklist is verified at.
 const VIEWPORTS = [
     { name: "desktop", width: 1280, height: 900 },

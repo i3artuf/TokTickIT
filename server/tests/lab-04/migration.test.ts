@@ -31,7 +31,7 @@ describe("MIG-01 / MIG-04: Lab 4 ActionTaken migration and schema-level BR-01 en
 
         const maxTicket = await prisma.ticket.findFirst({ orderBy: { id: "desc" } });
         missingTicketId = (maxTicket?.id ?? 0) + 100000;
-    });
+    }, 30000); // Restoring the database launches the real seed CLI; allow startup time.
 
     afterAll(async () => {
         await prisma.$executeRawUnsafe(
@@ -71,6 +71,40 @@ describe("MIG-01 / MIG-04: Lab 4 ActionTaken migration and schema-level BR-01 en
         expect(created.actionDateTime).toBeInstanceOf(Date);
 
         await prisma.actionTaken.delete({ where: { id: created.id } });
+    });
+
+    it("AUDIT-MIG-01: applies and rolls back actual Lab 4 SQL on an isolated copy without altering legacy rows", async () => {
+        const client = new Client({ connectionString: process.env.DATABASE_URL });
+        await client.connect();
+        const tables = ["User", "Category", "RelatedSystem", "Ticket", "Attachment", "PublicComment", "InternalNote"];
+        try {
+            await client.query("BEGIN");
+            await client.query('CREATE SCHEMA lab4_audit_migration');
+            await client.query('SET LOCAL search_path TO lab4_audit_migration');
+            const fingerprint = async () => {
+                const result: Record<string, string> = {};
+                for (const table of tables) {
+                    const rows = await client.query(`SELECT md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id)::text, '[]')) AS hash FROM "${table}" t`);
+                    result[table] = rows.rows[0].hash;
+                }
+                return result;
+            };
+            for (const table of tables) {
+                await client.query(`CREATE TABLE "${table}" (LIKE public."${table}" INCLUDING ALL)`);
+                await client.query(`INSERT INTO "${table}" SELECT * FROM public."${table}"`);
+            }
+            const before = await fingerprint();
+            const dir = findLab4MigrationDir();
+            await client.query(fs.readFileSync(path.join(dir, "migration.sql"), "utf8"));
+            expect(await fingerprint()).toEqual(before);
+            expect((await client.query('SELECT count(*)::int AS n FROM "ActionTaken"')).rows[0].n).toBe(0);
+            await client.query(fs.readFileSync(path.join(dir, "down.sql"), "utf8"));
+            expect(await fingerprint()).toEqual(before);
+            expect((await client.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='lab4_audit_migration' AND table_name='ActionTaken'")).rows[0].n).toBe(0);
+        } finally {
+            await client.query("ROLLBACK");
+            await client.end();
+        }
     });
 
     it("MIG-02: down-migration drops ActionTaken cleanly without touching Lab 1-3 tables", async () => {

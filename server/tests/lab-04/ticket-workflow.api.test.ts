@@ -70,6 +70,47 @@ describe("Ticket status/resolution workflow API (API-09..14, API-21, API-22, API
         return ticket!.updatedAt.toISOString();
     }
 
+    it("AUDIT-WF-01: rejects a status write without the required concurrency token", async () => {
+        const ticket = await createTicket({ status: "NEW" });
+        const res = await patchStatus(ticket.id, { status: "OPEN" }, samiraToken);
+        expect(res.status).toBe(400);
+        expect(res.body.error.fields.expectedUpdatedAt).toBeDefined();
+        expect((await prisma.ticket.findUnique({ where: { id: ticket.id } }))!.currentStatus).toBe("NEW");
+    });
+
+    it("AUDIT-WF-02: simultaneous different transitions cannot both consume one token", async () => {
+        const ticket = await createTicket({ status: "IN_PROGRESS" });
+        const token = ticket.updatedAt.toISOString();
+        const responses = await Promise.all([
+            patchStatus(ticket.id, { status: "WAITING_FOR_REQUESTER", expectedUpdatedAt: token }, samiraToken),
+            patchStatus(ticket.id, { status: "RESOLVED", resolutionSummary: "Concurrent resolution", expectedUpdatedAt: token }, marcusToken),
+        ]);
+        expect(responses.map(r => r.status).sort()).toEqual([200, 409]);
+        const winner = responses.find(r => r.status === 200)!;
+        const loser = responses.find(r => r.status === 409)!;
+        expect(loser.body.error.code).toBe("STALE_UPDATE");
+        expect(loser.body.error.data.current.status).toBe(winner.body.data.status);
+        expect((await prisma.ticket.findUnique({ where: { id: ticket.id } }))!.currentStatus).toBe(winner.body.data.status);
+    });
+
+    it("AUDIT-ASSIGN-01: rejects inactive, wrong-role and nonexistent assignees, and Requester assignment writes", async () => {
+        const ticket = await createTicket();
+        const inactive = await prisma.user.findFirst({ where: { role: "IT_STAFF", isActive: false } });
+        expect(inactive).not.toBeNull();
+        const maximum = await prisma.user.aggregate({ _max: { id: true } });
+        const assign = (ownerId: number, token = samiraToken) => request(app)
+            .patch(`/api/staff/tickets/${ticket.id}/assign`)
+            .set("Cookie", `toktickit_session=${token}`).send({ ownerId });
+        for (const ownerId of [inactive!.id, requesterAlice.id, maximum._max.id! + 100000]) {
+            const res = await assign(ownerId);
+            expect(res.status).toBe(400);
+            expect(res.body.message).toMatch(/active IT Staff or Administrator/);
+            expect((await prisma.ticket.findUnique({ where: { id: ticket.id } }))!.ownerId).toBe(ticket.ownerId);
+        }
+        expect((await assign(staffMarcus.id, aliceToken)).status).toBe(403);
+        expect((await prisma.ticket.findUnique({ where: { id: ticket.id } }))!.ownerId).toBe(ticket.ownerId);
+    });
+
     beforeAll(async () => {
         requesterAlice = await prisma.user.findFirst({ where: { email: "alice.tanaka@example.com" } });
         requesterBob = await prisma.user.findFirst({ where: { email: "bob.chavez@example.com" } });

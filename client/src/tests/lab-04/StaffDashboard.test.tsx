@@ -52,6 +52,7 @@ describe("StaffDashboard (UI-01, UI-02)", () => {
         // Metric card values from the fetched response.
         expect(screen.getByTestId("staff-dashboard-card-new")).toHaveTextContent("14");
         expect(screen.getByTestId("staff-dashboard-card-open")).toHaveTextContent("23");
+        expect(screen.getByTestId("staff-dashboard-card-open")).toHaveAttribute("href", "/staff/queue?status=DASHBOARD_OPEN");
         expect(screen.getByTestId("staff-dashboard-card-in-progress")).toHaveTextContent("18");
         expect(screen.getByTestId("staff-dashboard-card-waiting")).toHaveTextContent("7");
         expect(screen.getByTestId("staff-dashboard-card-my-assigned")).toHaveTextContent("16");
@@ -87,6 +88,17 @@ describe("StaffDashboard (UI-01, UI-02)", () => {
         expect(screen.queryByTestId("staff-dashboard-error")).toBeNull();
         // The empty recent-tickets block replaces the list.
         expect(screen.getByTestId("staff-dashboard-recent-tickets-empty")).toBeInTheDocument();
+    });
+
+    it("renders current-user recent actions with Ticket navigation", async () => {
+        vi.spyOn(dashboardApi, "fetchStaffDashboard").mockResolvedValue({ ...STAFF_DATA, recentActions: [{
+            id: 99, ticketId: 8, description: "Replaced cable", result: "Connected",
+            actionDateTime: "2026-10-29T01:00:00Z", ticket: { ticketNumber: "TK-AUDIT-8" },
+        }] });
+        renderDashboard();
+        const panel = await screen.findByTestId("staff-dashboard-recent-actions");
+        expect(panel).toHaveTextContent("Replaced cable");
+        expect(within(panel).getByRole("link")).toHaveAttribute("href", "/staff/tickets/8");
     });
 
     it("shows the error banner with a Retry action when the API fails, and retry re-fetches", async () => {

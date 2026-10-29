@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { dashboardStatusFilter } from "../utils/dashboardFilters";
 
 export interface ListStaffTicketsOptions {
     search?: string;
@@ -15,7 +16,7 @@ export async function listStaffTickets(options: ListStaffTicketsOptions) {
     const where: any = {};
 
     if (options.status) {
-        where.currentStatus = options.status;
+        where.currentStatus = dashboardStatusFilter(options.status, "staff");
     }
 
     if (options.itPriority) {

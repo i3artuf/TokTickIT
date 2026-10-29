@@ -3,6 +3,13 @@
 
 ## 1. Actions Taken
 
+Audit clarification (2026-10-29): Action creation uses a database transaction and a parent-Ticket
+row lock to make both same-key and different-key duplicate checks safe under simultaneous
+requests. Action edits and canonical Ticket status changes use an atomic timestamp predicate;
+the canonical status endpoint rejects an omitted `expectedUpdatedAt` with `400 VALIDATION_ERROR`.
+The legacy Lab 3 status route keeps its original compatibility contract; it is not equivalent to
+the canonical endpoint's required-token guarantee.
+
 ### 1.1 `GET /api/tickets/:ticketId/actions`
 List Actions Taken for a Ticket, newest first.
 
@@ -127,6 +134,9 @@ Administrator, any time.
 ---
 
 ## 2. Ticket Status & Resolution
+
+The required resolution gate follows approved BR-06/07: authorized role, permitted transition,
+and a nonempty summary. An ActionTaken-count prerequisite is not part of this approved contract.
 
 ### 2.1 `PATCH /api/tickets/:ticketId/status`
 Change a Ticket's status per the transition matrix in `specification.md` §5.1.
