@@ -443,37 +443,3 @@ Notes:
   #58 note in §15. Any future responsive test should assert `window.scrollX === 0` after a
   `scrollTo` attempt, plus viewport escape by elements that are *not* inside an `overflow-x`
   ancestor.
-
-## 17. Independent verification audit — 2026-10-29
-
-This section supersedes historical completion claims above. Results apply to local `docs/lab4`
-at base 8b05e2504e1bfba46cf60895b3a4aae6186f4b08 plus the hashed working-tree changes,
-not remote main. Remote main still contains Lab 3. See verified-audit.md, the 189-row
-traceability CSV and artifacts/lab-04/audit-2026-10-29/ for full evidence.
-
-Additional executable coverage:
-
-- AUDIT-WF-01/02: required canonical token; simultaneous different Ticket transitions.
-- AUDIT-ASSIGN-01: inactive, wrong-role and nonexistent Ticket assignees plus Requester
-  assignment attempts are rejected without changing ownership.
-- AUDIT-ACT-01/02/03: simultaneous same/varied-key duplicates; simultaneous edits; stable
-  timestamp/id ordering and immutable Action Date/Time/performer after edits.
-- AUDIT-DASH-01/02/03: Staff and Requester Open-card/list totals; current-user Action scope.
-- AUDIT-MIG-01: actual migration up/down in an isolated transaction with legacy-row fingerprints.
-- AUDIT-WF-UI-01: reproduced priority-save token race, RED then GREEN; E2E checks actual token.
-- AUDIT-UI-01..05: current-user Actions, zero Requester, real 403s, controlled 503/retry,
-  genuine stale conflicts/draft recovery, all-severity dashboard axe scans, readable viewport
-  screenshots, and Requester read-only Actions.
-
-Known limits: AC-14/API-24 cover Reopen only, not Requester Ticket editing. There is no
-append-only Action revision or Ticket transition-event store. The legacy Lab 3 status route
-keeps its tokenless compatibility contract. Rubric Action-assignment terminology is mapped
-to Ticket workflow under a documented assumption, not verified instructor approval.
-
-| Check | Current result |
-|---|---|
-| server unit/integration/components | 301 / 301; 0 / 0; server-tests.json; success=True |
-| client unit/integration/components | 117 / 117; 0 / 0; client-tests.json; success=True |
-| Playwright lab4 | 54 passed; 0 failed; 0 skipped; 0 flaky; playwright-lab4.json |
-| Playwright audit-ui | 5 passed; 0 failed; 0 skipped; 0 flaky; playwright-audit-ui.json |
-| Playwright final combined Labs 2–4 regression | 210 passed; 0 failed; 0 skipped; 0 flaky; playwright-regression.json |
