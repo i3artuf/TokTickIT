@@ -49,6 +49,7 @@ __pycache__/
 
 # Submission documents
 artifacts/lab-*/audit-*/
+artifacts/lab-*/submit/
 
 # AI agent attachment storage (conversation blobs)
 .attachments-storage/
