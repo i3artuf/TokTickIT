@@ -29,9 +29,14 @@ export function StaffQueue() {
     const initialSearch = searchParams.get("search") || "";
     const [searchInput, setSearchInput] = useState(initialSearch);
     const [search, setSearch] = useState(initialSearch);
-    const [statusFilter, setStatusFilter] = useState("");
+    // FR-12: dashboard metric cards link here pre-filtered, e.g. /staff/queue?status=NEW or
+    // /staff/queue?owner=me, so the queue opens already scoped to that card's bucket.
+    const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
     const [itPriorityFilter, setItPriorityFilter] = useState("");
-    const [ownerFilter, setOwnerFilter] = useState<"" | "me" | "unassigned">("");
+    const [ownerFilter, setOwnerFilter] = useState<"" | "me" | "unassigned">(() => {
+        const owner = searchParams.get("owner");
+        return owner === "me" || owner === "unassigned" ? owner : "";
+    });
     const [filtersOpen, setFiltersOpen] = useState(false);
 
     // Sorting state (Step 1 Option b: all 5 UI headers supported)
@@ -182,6 +187,7 @@ export function StaffQueue() {
                                 }}
                             >
                                 <option value="">All Statuses</option>
+                                <option value="DASHBOARD_OPEN">Open and Reopened</option>
                                 <option value="NEW">New</option>
                                 <option value="OPEN">Open</option>
                                 <option value="IN_PROGRESS">In Progress</option>

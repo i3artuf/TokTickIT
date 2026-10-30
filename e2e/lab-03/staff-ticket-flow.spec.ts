@@ -56,13 +56,28 @@ test.describe("Lab 3 IT Staff Ticket Flow E2E", () => {
         // 3. AC-28: change IT Priority MEDIUM -> HIGH; Requested Priority stays MEDIUM
         const prioritySelect = page.getByTestId("staff-ticket-priority-select");
         await prioritySelect.selectOption("HIGH");
+        const prioritySaved = page.waitForResponse(response =>
+            response.url().includes("/it-priority") && response.request().method() === "PATCH");
         await page.getByRole("button", { name: "Save" }).first().click();
+        const priorityResponse = await prioritySaved;
+        expect(priorityResponse.status()).toBe(200);
+        const savedPriority = await priorityResponse.json();
         await expect(prioritySelect).toHaveValue("HIGH");
+        // The priority update also bumps the Ticket's concurrency token. Wait for the save to
+        // settle (the Save control only disappears once the response has been applied) so the
+        // status change below echoes the refreshed token rather than a stale one.
+        await expect(page.getByRole("button", { name: "Save" })).toHaveCount(0);
 
-        // 4. AC-29: valid status transition NEW -> OPEN
+        // 4. AC-29: valid status transition NEW -> OPEN. Since Lab 4 the status control is
+        //    TicketWorkflow, which applies In Progress / Waiting for Requester / Reopened
+        //    immediately on selection (no separate Save step) and updates the summary badge
+        //    from the response.
         const statusSelect = page.getByTestId("staff-ticket-status-select");
+        const statusRequest = page.waitForRequest(request =>
+            /\/api\/tickets\/\d+\/status$/.test(request.url()) && request.method() === "PATCH");
         await statusSelect.selectOption("OPEN");
-        await page.getByRole("button", { name: "Save" }).first().click();
+        expect((await statusRequest).postDataJSON().expectedUpdatedAt).toBe(savedPriority.data.updatedAt);
+        await expect(page.getByTestId("ticket-status-badge")).toHaveText("Open");
         await expect(statusSelect).toHaveValue("OPEN");
 
         // 5. AC-13: post a public comment

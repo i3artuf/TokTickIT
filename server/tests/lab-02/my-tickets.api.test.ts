@@ -13,6 +13,7 @@ let relatedSystemId: number;
 // Session tokens signed for each test user
 let tokenA: string;
 let tokenB: string;
+let fixtureSequence = 1000;
 
 async function createTicket(overrides: Partial<{
     requesterId: number;
@@ -27,7 +28,7 @@ async function createTicket(overrides: Partial<{
 }>) {
     return prisma.ticket.create({
         data: {
-            ticketNumber: overrides.ticketNumber ?? `TK-20260904-${Math.floor(Math.random() * 9000 + 1000)}`,
+            ticketNumber: overrides.ticketNumber ?? `TK-20260904-${++fixtureSequence}`,
             requesterId: overrides.requesterId ?? requesterA,
             categoryId: overrides.categoryId ?? hardwareCategoryId,
             relatedSystemId,
@@ -44,6 +45,7 @@ async function createTicket(overrides: Partial<{
 describe("GET /api/tickets", () => {
     beforeAll(async () => {
         await prisma.attachment.deleteMany({});
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         await prisma.user.deleteMany({ where: { email: { contains: "mytickets.test" } } });
 
@@ -83,12 +85,14 @@ describe("GET /api/tickets", () => {
 
     afterAll(async () => {
         await prisma.attachment.deleteMany({});
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         await prisma.user.deleteMany({ where: { email: { contains: "mytickets.test" } } });
         await prisma.$disconnect();
     });
 
     it("returns only the requesting Requester's tickets, never another's (API-08, AC-08, BR-06)", async () => {
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         await createTicket({ requesterId: requesterA, summary: "A ticket one" });
         await createTicket({ requesterId: requesterA, summary: "A ticket two" });
@@ -117,6 +121,7 @@ describe("GET /api/tickets", () => {
     });
 
     it("filters results by search keyword against ticketNumber or summary (API-09, AC-09)", async () => {
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         await createTicket({ requesterId: requesterA, ticketNumber: "TK-20260904-0010", summary: "Laptop battery drains quickly" });
         await createTicket({ requesterId: requesterA, ticketNumber: "TK-20260904-0020", summary: "Cannot connect to VPN" });
@@ -139,6 +144,7 @@ describe("GET /api/tickets", () => {
     });
 
     it("filters results by categoryId and status (API-10, AC-10)", async () => {
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         await createTicket({ requesterId: requesterA, categoryId: hardwareCategoryId, summary: "Hardware ticket" });
         await createTicket({ requesterId: requesterA, categoryId: softwareCategoryId, summary: "Software ticket" });
@@ -154,6 +160,7 @@ describe("GET /api/tickets", () => {
     });
 
     it("sorts by createdAt descending by default with id DESC tie-breaker (API-11, AC-11, BR-23)", async () => {
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         const first = await createTicket({
             requesterId: requesterA,
@@ -176,6 +183,7 @@ describe("GET /api/tickets", () => {
     });
 
     it("supports sorting by updatedAt asc and desc (api-spec.md Sec. 5)", async () => {
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         const t1 = await createTicket({
             requesterId: requesterA,
@@ -197,6 +205,7 @@ describe("GET /api/tickets", () => {
     });
 
     it("paginates results with correct pagination metadata (API-12, AC-12, BR-24)", async () => {
+        await prisma.actionTaken.deleteMany({});
         await prisma.ticket.deleteMany({});
         for (let i = 0; i < 15; i++) {
             await createTicket({ requesterId: requesterA, summary: `Ticket number ${i}` });

@@ -15,8 +15,11 @@ const DEV_PASSWORD = "DevPass@2026!";
 
 export default async function globalSetup() {
     for (const dir of SCREENSHOT_DIRS) {
-        fs.rmSync(dir, { recursive: true, force: true });
-        fs.mkdirSync(dir, { recursive: true });
+        // Audit runs keep the user's existing screenshots intact.
+        const target = process.env.LAB4_SCREENSHOT_ROOT
+            ? `${process.env.LAB4_SCREENSHOT_ROOT}/lab2-setup/${dir.split('/').pop()}` : dir;
+        if (!process.env.LAB4_SCREENSHOT_ROOT) fs.rmSync(target, { recursive: true, force: true });
+        fs.mkdirSync(target, { recursive: true });
     }
 
     // Start every run from the documented seed state so consecutive runs are

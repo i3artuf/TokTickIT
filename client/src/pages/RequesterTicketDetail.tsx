@@ -11,6 +11,8 @@ import {
 } from "../api/tickets.api";
 import { Badge } from "../components/Badge";
 import { AttachmentSection } from "../components/AttachmentSection";
+import { ActionsTaken } from "../components/ActionsTaken";
+import { TicketWorkflow } from "../components/TicketWorkflow";
 import "./RequesterTicketDetail.css";
 
 type ScreenState = "loading" | "ready" | "error";
@@ -181,9 +183,29 @@ export function RequesterTicketDetail() {
                     <div className="ticket-header-field">
                         <dt>Status</dt>
                         <dd>
-                            <span data-testid="ticket-status-badge">
-                                <Badge kind="status" value={ticket.currentStatus} />
-                            </span>
+                            {/* Requester-facing status control (FR-07, BR-15). The advisory
+                                appears-resolved button below is retained from Lab 3; the
+                                ui-spec §7 toggle lives in TicketWorkflow for new surfaces. */}
+                            <TicketWorkflow
+                                ticketId={ticket.id}
+                                status={ticket.currentStatus}
+                                role="REQUESTER"
+                                isOwner
+                                appearsResolved={ticket.appearsResolved ?? false}
+                                updatedAt={ticket.updatedAt}
+                                showAppearsResolved={false}
+                                onStatusChange={(result) =>
+                                    setTicket((prev) =>
+                                        prev
+                                            ? {
+                                                  ...prev,
+                                                  currentStatus: result.status,
+                                                  updatedAt: result.updatedAt,
+                                              }
+                                            : prev
+                                    )
+                                }
+                            />
                         </dd>
                     </div>
                     <div className="ticket-header-field">
@@ -271,6 +293,16 @@ export function RequesterTicketDetail() {
                         <li className="ticket-comment-empty">No comments yet.</li>
                     )}
                 </ul>
+            </section>
+
+            {/* Actions Taken — always read-only for a Requester (FR-03, ui-spec §3.2) */}
+            <section className="ticket-actions-taken-section mb-4">
+                <ActionsTaken
+                    ticketId={ticket.id}
+                    ticketStatus={ticket.currentStatus}
+                    role="REQUESTER"
+                    currentUserId={requesterId}
+                />
             </section>
 
             <AttachmentSection ticketId={ticket.id} requesterId={requesterId} />
