@@ -66,7 +66,14 @@ export async function changeTicketStatus(ticketId: number, actor: Actor, body: R
     // still New/Open (BR-15). A role/ownership failure is 403, never a matrix 400.
     if (actor.role === "REQUESTER") {
         if (!isRequesterOwner) return { forbidden: true as const };
-        if (to !== "CANCELLED" || (ticket.currentStatus !== "NEW" && ticket.currentStatus !== "OPEN")) {
+        if (to !== "CANCELLED") return { forbidden: true as const };
+        // BR-15: Requesters may cancel only from New/Open. Any other status is 403,
+        // EXCEPT for CANCELLED itself: a retry on an already-Cancelled ticket falls
+        // through to the OCC check below so that:
+        //   - no token  → 400 VALIDATION (token is required per api-spec §2.1)
+        //   - stale token → 409 STALE_UPDATE (spec §10.1 — token mismatch, UI can resync)
+        //   - current token → 400 INVALID_TRANSITION (CANCELLED is terminal per §5.1)
+        if (ticket.currentStatus !== "NEW" && ticket.currentStatus !== "OPEN" && ticket.currentStatus !== "CANCELLED") {
             return { forbidden: true as const };
         }
     }

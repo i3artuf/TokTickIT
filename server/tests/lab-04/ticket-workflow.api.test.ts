@@ -7,7 +7,7 @@ import { signSessionToken } from "../../src/lib/session";
 // Ref: docs/lab-04/specification.md §5.1 (transition matrix), §5.2 (resolution gate),
 //      §10.1 (STALE_UPDATE 409 vs INVALID_TRANSITION 400), BR-06, BR-07, BR-09, BR-14, BR-15, BR-16
 // Ref: docs/lab-04/api-spec.md §2.1, §2.2
-// Ref: docs/lab-04/tests.md API-09..API-14, API-21, API-22, API-28, API-29, WF-01, WF-02, AUTH-02
+// Ref: docs/lab-04/tests.md API-09..API-14, API-21, API-22, API-28, API-29, WF-01, WF-02, AUTH-02, OCC-01, OCC-02
 
 const MARKER = "TKT-L4WF";
 let seq = 0;
@@ -516,5 +516,65 @@ describe("Ticket status/resolution workflow API (API-09..14, API-21, API-22, API
 
         const stored = await prisma.ticket.findUnique({ where: { id: ticket.id } });
         expect(stored!.currentStatus).toBe("IN_PROGRESS");
+    });
+
+    // OCC-01: appearsResolved write is atomic — a concurrent Staff Reopen cannot be silently overwritten
+    it("OCC-01: Staff Reopen clears appearsResolved; a concurrent Requester flag write gets 409 STALE_UPDATE and does not restore the flag", async () => {
+        const ticket = await createTicket({ status: "RESOLVED", appearsResolved: false });
+
+        // Staff Reopens first — this bumps updatedAt and clears appearsResolved (BR-16)
+        const reopenToken = ticket.updatedAt.toISOString();
+        const reopenRes = await patchStatus(
+            ticket.id,
+            { status: "REOPENED", expectedUpdatedAt: reopenToken },
+            samiraToken
+        );
+        expect(reopenRes.status).toBe(200);
+        const afterReopen = await prisma.ticket.findUnique({ where: { id: ticket.id } });
+        expect(afterReopen!.appearsResolved).toBe(false);
+
+        // Requester now tries to set flag using the OLD token (before Reopen)
+        const staleRes = await patchAppearsResolved(
+            ticket.id,
+            { appearsResolved: true, expectedUpdatedAt: reopenToken },
+            aliceToken
+        );
+        expect(staleRes.status).toBe(409);
+        expect(staleRes.body.error.code).toBe("STALE_UPDATE");
+
+        // appearsResolved must still be false — the Reopen side-effect was NOT overwritten
+        const final = await prisma.ticket.findUnique({ where: { id: ticket.id } });
+        expect(final!.appearsResolved).toBe(false);
+    });
+
+    // OCC-02: Requester Cancel retry returns 409 STALE_UPDATE (not 403), no data mutation
+    it("OCC-02: first Requester Cancel succeeds 200; retry with old token returns 409 STALE_UPDATE without re-mutating the ticket", async () => {
+        const ticket = await createTicket({ status: "OPEN", requesterId: requesterAlice.id });
+        const originalToken = ticket.updatedAt.toISOString();
+
+        // First cancel — must succeed
+        const first = await patchStatus(
+            ticket.id,
+            { status: "CANCELLED", expectedUpdatedAt: originalToken },
+            aliceToken
+        );
+        expect(first.status).toBe(200);
+        expect(first.body.data.status).toBe("CANCELLED");
+
+        // Retry with the same (now stale) token
+        const retry = await patchStatus(
+            ticket.id,
+            { status: "CANCELLED", expectedUpdatedAt: originalToken },
+            aliceToken
+        );
+        expect(retry.status).toBe(409);
+        expect(retry.body.error.code).toBe("STALE_UPDATE");
+        // current state echoed back so the UI can resync
+        expect(retry.body.error.data.current.status).toBe("CANCELLED");
+
+        // DB record unchanged — still Cancelled, updatedAt untouched since first success
+        const stored = await prisma.ticket.findUnique({ where: { id: ticket.id } });
+        expect(stored!.currentStatus).toBe("CANCELLED");
+        expect(stored!.updatedAt.toISOString()).toBe(first.body.data.updatedAt);
     });
 });

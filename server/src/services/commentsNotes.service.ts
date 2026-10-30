@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 // Ref: docs/lab-03/api-spec.md Endpoints 15-19
@@ -198,24 +199,36 @@ export async function markTicketAppearsResolved(
     const appearsResolved =
         typeof options.appearsResolved === "boolean" ? options.appearsResolved : true;
 
-    const updated = await prisma.ticket.update({
-        where: { id: ticketId },
-        data: { appearsResolved },
-        select: {
-            id: true,
-            appearsResolved: true,
-            currentStatus: true,
-            updatedAt: true,
-        },
-    });
+    try {
+        // Write atomically using the OCC token to prevent a concurrent Staff Reopen
+        // (which clears appearsResolved via BR-16) from being silently overwritten.
+        const updated = await prisma.ticket.update({
+            where: { id: ticketId, updatedAt: ticket.updatedAt },
+            data: { appearsResolved },
+            select: {
+                id: true,
+                appearsResolved: true,
+                currentStatus: true,
+                updatedAt: true,
+            },
+        });
 
-    // Never touches `status` (FR-09/AC-06): it is only ever *read* back for the client.
-    return {
-        data: {
-            id: updated.id,
-            appearsResolved: updated.appearsResolved,
-            status: updated.currentStatus,
-            updatedAt: updated.updatedAt,
-        },
-    };
+        // Never touches `status` (FR-09/AC-06): it is only ever *read* back for the client.
+        return {
+            data: {
+                id: updated.id,
+                appearsResolved: updated.appearsResolved,
+                status: updated.currentStatus,
+                updatedAt: updated.updatedAt,
+            },
+        };
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+            const current = await prisma.ticket.findUnique({ where: { id: ticketId } });
+            return current
+                ? { stale: true, current: { status: current.currentStatus, updatedAt: current.updatedAt } }
+                : { notFound: true };
+        }
+        throw error;
+    }
 }
