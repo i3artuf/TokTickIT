@@ -67,13 +67,13 @@ export async function changeTicketStatus(ticketId: number, actor: Actor, body: R
     if (actor.role === "REQUESTER") {
         if (!isRequesterOwner) return { forbidden: true as const };
         if (to !== "CANCELLED") return { forbidden: true as const };
-        // BR-15: only cancellable from New/Open. But if the ticket is *already* Cancelled,
-        // treat a retry with a stale token as STALE_UPDATE (409) so the UI can resync
-        // silently without showing a misleading 403 to the user.
-        if (ticket.currentStatus === "CANCELLED") {
-            return { stale: true as const, current: currentState(ticket) };
-        }
-        if (ticket.currentStatus !== "NEW" && ticket.currentStatus !== "OPEN") {
+        // BR-15: Requesters may cancel only from New/Open. Any other status is 403,
+        // EXCEPT for CANCELLED itself: a retry on an already-Cancelled ticket falls
+        // through to the OCC check below so that:
+        //   - no token  → 400 VALIDATION (token is required per api-spec §2.1)
+        //   - stale token → 409 STALE_UPDATE (spec §10.1 — token mismatch, UI can resync)
+        //   - current token → 400 INVALID_TRANSITION (CANCELLED is terminal per §5.1)
+        if (ticket.currentStatus !== "NEW" && ticket.currentStatus !== "OPEN" && ticket.currentStatus !== "CANCELLED") {
             return { forbidden: true as const };
         }
     }
